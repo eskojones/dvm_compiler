@@ -8,69 +8,65 @@ import (
 	"strings"
 )
 
-
 type instr struct {
 	name   string
 	opcode uint8
 	size   uint8
 }
 
-
 var instructions = []instr{
-	{"nop", 	0x00, 	1},
-	{"hlt", 	0xff, 	1},
-	{"print", 	0xfe, 	2},
-	{"ld", 		0x01, 	4},
-	{"st", 		0x02, 	4},
-	{"int", 	0x03, 	2},
-	{"inti", 	0x04, 	3},
-	{"ret", 	0x05, 	1},
-	{"mov", 	0x06, 	3},
-	{"movi", 	0x07, 	4},
-	{"cmp", 	0x08, 	3},
-	{"cmpi", 	0x09, 	4},
-	{"jmp", 	0x0a, 	2},
-	{"jmpi", 	0x0b, 	3},
-	{"jz", 		0x0c, 	2},
-	{"jzi", 	0x0d, 	3},
-	{"jnz", 	0x0e, 	2},
-	{"jnzi", 	0x0f, 	3},
-	{"jl", 		0x10, 	2},
-	{"jli", 	0x11, 	3},
-	{"jg", 		0x12, 	2},
-	{"jgi", 	0x13, 	3},
-	{"inc", 	0x14, 	2},
-	{"dec", 	0x15, 	2},
-	{"add", 	0x16, 	3},
-	{"addi", 	0x17, 	4},
-	{"sub", 	0x18, 	3},
-	{"subi", 	0x19, 	4},
-	{"mul", 	0x1a, 	3},
-	{"muli", 	0x1b, 	4},
-	{"div",	 	0x1c, 	3},
-	{"divi", 	0x1d, 	4},
-	{"call", 	0x1e, 	2},
-	{"calli", 	0x1f, 	3},
+	{"nop", 0x00, 1},
+	{"hlt", 0xff, 1},
+	{"print", 0xfe, 2},
+	{"ld", 0x01, 4},
+	{"st", 0x02, 4},
+	{"int", 0x03, 2},
+	{"inti", 0x04, 3},
+	{"ret", 0x05, 1},
+	{"mov", 0x06, 3},
+	{"movi", 0x07, 4},
+	{"cmp", 0x08, 3},
+	{"cmpi", 0x09, 4},
+	{"jmp", 0x0a, 2},
+	{"jmpi", 0x0b, 3},
+	{"jz", 0x0c, 2},
+	{"jzi", 0x0d, 3},
+	{"jnz", 0x0e, 2},
+	{"jnzi", 0x0f, 3},
+	{"jl", 0x10, 2},
+	{"jli", 0x11, 3},
+	{"jg", 0x12, 2},
+	{"jgi", 0x13, 3},
+	{"inc", 0x14, 2},
+	{"dec", 0x15, 2},
+	{"add", 0x16, 3},
+	{"addi", 0x17, 4},
+	{"sub", 0x18, 3},
+	{"subi", 0x19, 4},
+	{"mul", 0x1a, 3},
+	{"muli", 0x1b, 4},
+	{"div", 0x1c, 3},
+	{"divi", 0x1d, 4},
+	{"call", 0x1e, 2},
+	{"calli", 0x1f, 3},
 }
 
-
 type statement struct {
-	line_num uint
-	address uint16
-	source []string
-	byte_code [6]byte
+	line_num   uint
+	address    uint16
+	source     []string
+	byte_code  [6]byte
 	byte_count int
 }
 
 var opcode2instr = map[uint8]instr{}
 var name2instr = map[string]instr{}
 
-
-func cleanString (dirty string, comment string) string {
+func cleanString(dirty string, comment string) string {
 	var clean string = strings.Clone(dirty)
 	var idx = strings.Index(clean, comment)
 	if idx != -1 {
-		clean = clean[0 : idx]
+		clean = clean[0:idx]
 	}
 	clean = strings.ReplaceAll(clean, "\t", " ")
 	clean = strings.ReplaceAll(clean, ",", " ")
@@ -81,8 +77,7 @@ func cleanString (dirty string, comment string) string {
 	return clean
 }
 
-
-func createLabels (statements []*statement) (map[string]uint16, error) {
+func createLabels(statements []*statement) (map[string]uint16, error) {
 	labels := map[string]uint16{}
 	address := uint16(0)
 
@@ -121,7 +116,12 @@ func createLabels (statements []*statement) (map[string]uint16, error) {
 					s.byte_count++
 					isImmediate = true
 				} else if arg_str[0] == '@' {
+					if isImmediate {
+						fmt.Printf("Line %d: More than one argument is an immediate value, this is invalid.\n", s.line_num)
+						return labels, errors.New("Multiple Immediate Values")
+					}
 					s.byte_count++
+					isImmediate = true
 				}
 			}
 			s.byte_count++
@@ -132,8 +132,7 @@ func createLabels (statements []*statement) (map[string]uint16, error) {
 	return labels, nil
 }
 
-
-func parseStatements (statements []*statement, labels map[string]uint16, print_debug bool) error {
+func parseStatements(statements []*statement, labels map[string]uint16, print_debug bool) error {
 	var address uint16 = 0
 
 	for _, s := range statements {
@@ -160,7 +159,8 @@ func parseStatements (statements []*statement, labels map[string]uint16, print_d
 					} else {
 						arg_int, _ = strconv.ParseUint(arg_str[1:], 10, 0)
 					}
-					s.byte_code[0] = instruction.opcode + 1
+					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
+					s.byte_code[0] = instruction.opcode
 					s.byte_code[s.byte_count] = uint8(arg_int >> 8)
 					s.byte_count++
 					s.byte_code[s.byte_count] = uint8(arg_int & 0x00ff)
@@ -168,7 +168,8 @@ func parseStatements (statements []*statement, labels map[string]uint16, print_d
 				} else if arg_str[0] == '@' {
 					//label
 					arg_int, _ = strconv.ParseUint(fmt.Sprintf("%04x", labels[arg_str[1:]]), 16, 0)
-					s.byte_code[0] = instruction.opcode + 1
+					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
+					s.byte_code[0] = instruction.opcode
 					s.byte_code[s.byte_count] = uint8(arg_int >> 8)
 					s.byte_count++
 					s.byte_code[s.byte_count] = uint8(arg_int & 0x00ff)
@@ -179,7 +180,7 @@ func parseStatements (statements []*statement, labels map[string]uint16, print_d
 
 		s.address = address
 		address += uint16(s.byte_count)
-		
+
 		if print_debug {
 			//debug print the original source side by side with the byte-code
 			fmt.Printf("0x%04x ", address)
@@ -199,8 +200,6 @@ func parseStatements (statements []*statement, labels map[string]uint16, print_d
 
 }
 
-
-
 func main() {
 	if len(os.Args) != 3 {
 		exe, _ := os.Executable()
@@ -210,7 +209,6 @@ func main() {
 
 	source_file := os.Args[1]
 	output_file := os.Args[2]
-
 	fmt.Printf("Source File: %s\n", source_file)
 	fmt.Printf("Output File: %s\n", output_file)
 
@@ -223,8 +221,10 @@ func main() {
 	source_string := string(source_bytes[:])
 	source_lines := strings.Split(source_string, "\n")
 
+	// this will hold the working copy of the source
 	statements := make([]*statement, 0)
 
+	// for each line of source, clean the line and create statement struct
 	for line_num, line := range source_lines {
 		var clean string = cleanString(line, "#")
 		if len(clean) == 0 {
@@ -236,17 +236,22 @@ func main() {
 		statements = append(statements, line_statement)
 	}
 
+	// make maps so we can lookup any->instruction
 	for _, ins := range instructions {
 		opcode2instr[ins.opcode] = ins
 		name2instr[ins.name] = ins
 	}
 
+	// go through the program and populate the label map with addresses
 	labels, _ := createLabels(statements)
+
+	// write statement bytecode chunks
 	err = parseStatements(statements, labels, true)
 	if err != nil {
 		return
 	}
 
+	// concat all statement bytecode chunks into output bytecode
 	bytes_out := make([]byte, 0)
 	for _, s := range statements {
 		for i := 0; i < s.byte_count; i++ {
