@@ -335,7 +335,30 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 	}
 
 	return data, nil
+}
 
+func readSourceFile(filename string) ([]string, error) {
+	source := make([]string, 1)
+	bytes, err := os.ReadFile(filename)
+	if err != nil {
+		return source, errors.New("Source file not readable\n")
+	}
+	source_string := string(bytes[:])
+	source_lines := strings.Split(source_string, "\n")
+	for _, line := range source_lines {
+		if strings.Index(line, "%include") != 0 {
+			source = append(source, line)
+			continue
+		}
+		line_words := strings.Split(line, " ")
+		include_filename := strings.Trim(strings.TrimLeft(line_words[1][1:len(line_words[1])-1], "\""), "\"")
+		include_lines, err := readSourceFile(include_filename)
+		if err != nil {
+			return source, errors.New("Source file not readable\n")
+		}
+		source = append(source, include_lines...)
+	}
+	return source, nil
 }
 
 func main() {
@@ -350,14 +373,7 @@ func main() {
 	fmt.Printf("Source File: %s\n", source_file)
 	fmt.Printf("Output File: %s\n", output_file)
 
-	// read source file in, convert to string, split to lines[]
-	source_bytes, err := os.ReadFile(source_file)
-	if err != nil {
-		fmt.Printf("Source file not readable!")
-		return
-	}
-	source_string := string(source_bytes[:])
-	source_lines := strings.Split(source_string, "\n")
+	source_lines, err := readSourceFile(source_file)
 
 	// this will hold the working copy of the source
 	statements := make([]*statement, 0)
