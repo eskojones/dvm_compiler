@@ -1,0 +1,39 @@
+# test source file
+
+:start
+    mov r0, $0        # move immediate value 0 into register 0
+	mov r5, $0x3      # move immediate value 3 into register 5
+
+:loop
+	add r0, $1         # add immediate value 1 to value in register 0
+	print r0           # debug print the value in register 0
+	print r5           # debug print the value in register 0
+	cmp r0, r5         # compare the values in register 0 and register 5
+	jl @loop           # jump to label 'loop' if r0 was less than r5
+    call @fake_end     # call procedure at label
+    jmp @real_end      # jump to label 'real_end'
+
+:fake_end
+    print r14          # debug print the stack pointer
+    print r15          # debug print the program counter
+    call @deeper       # call procedure at label
+    ret                # resume program flow from calling address (line 13 + 1)
+
+:foo
+    # this should never execute
+    print r4
+
+:real_end
+    mov r0, $65
+    int $1
+    mov r0, $66
+    int $1
+    mov r0, $67
+    int $1
+    mov r0, $10
+    int $1
+    hlt                 # halt
+
+:deeper
+    print r3
+    ret                 # resume from caller (line 19 + 1)
