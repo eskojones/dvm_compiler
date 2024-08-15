@@ -1,5 +1,9 @@
 # test source file
 
+.0x0100 "ABC\n\0"
+#.0x0120 0xb00b
+#.0xf000 [ 0xff, 123, 0x33, 1, 2, 3, 4, 5, 0x61 ]
+
 :start
     mov r0, $0        # move immediate value 0 into register 0
 	mov r5, $0x3      # move immediate value 3 into register 5
@@ -24,16 +28,12 @@
     print r4
 
 :real_end
-    mov r0, $65
-    int $1
-    mov r0, $66
-    int $1
-    mov r0, $67
-    int $1
-    mov r0, $10
-    int $1
+    mov r0, $0x0100
+    int $3
     hlt                 # halt
 
 :deeper
     print r3
     ret                 # resume from caller (line 19 + 1)
+
+

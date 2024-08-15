@@ -98,6 +98,11 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 			continue
 		}
 
+		if instr_name[0] == '.' {
+			//data (ignore this until parse)
+			continue
+		}
+
 		_, exists := name2instr[instr_name]
 		if !exists {
 			fmt.Printf("Line %d: Invalid instruction (%s)\n", s.line_num, instr_name)
@@ -106,18 +111,24 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 		s.byte_count = 0
 		isImmediate := false
+
+		if len(s.source) > 3 {
+			fmt.Printf("Line %d: Too many arguments for statement \"%s\".\n", s.line_num, instr_name)
+			return labels, errors.New("Too many arguments in statement")
+		}
+
 		for idx, arg_str := range s.source {
 			if idx > 0 {
 				if arg_str[0] == '$' {
 					if isImmediate {
-						fmt.Printf("Line %d: More than one argument is an immediate value, this is invalid.\n", s.line_num)
+						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
 						return labels, errors.New("Multiple Immediate Values")
 					}
 					s.byte_count++
 					isImmediate = true
 				} else if arg_str[0] == '@' {
 					if isImmediate {
-						fmt.Printf("Line %d: More than one argument is an immediate value, this is invalid.\n", s.line_num)
+						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
 						return labels, errors.New("Multiple Immediate Values")
 					}
 					s.byte_count++
@@ -132,8 +143,77 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 	return labels, nil
 }
 
-func parseStatements(statements []*statement, labels map[string]uint16, print_debug bool) error {
+func parseIntData(data string) (uint8, uint16) {
+	var intval uint64
+	if strings.Index(data, "0x") == 0 {
+		intval, _ = strconv.ParseUint(data[2:], 16, 0)
+	} else {
+		intval, _ = strconv.ParseUint(data, 10, 0)
+	}
+	byte_count := uint8(1)
+	if intval > 0xff {
+		byte_count = 2
+	}
+	return byte_count, uint16(intval)
+}
+
+func parseData(data string) []byte {
+	bytes := make([]byte, 0)
+	var str = strings.Trim(strings.TrimLeft(data, " "), " ")
+	if str[0] == '[' && str[len(str)-1] == ']' {
+		// [ 0x45, 123 ]
+		var strs = strings.Split(str[1:len(str)-1], " ")
+		for _, i := range strs {
+			if len(i) == 0 {
+				continue
+			}
+			num_bytes, val := parseIntData(i)
+			if num_bytes == 2 {
+				bytes = append(bytes, uint8(val>>8))
+			}
+			bytes = append(bytes, uint8(val&0xff))
+		}
+
+	} else if (strings.Index(str, "0x") == 0 && len(str) <= 6) || (str[0] >= '0' && str[0] <= '9') {
+		// 0x1234 or 1234 or 123 etc
+		num_bytes, val := parseIntData(str)
+		if num_bytes == 2 {
+			bytes = append(bytes, uint8(val>>8))
+		}
+		bytes = append(bytes, uint8(val&0xff))
+
+	} else if str[0] == '"' && str[len(str)-1] == '"' {
+		// "this is a string\n"
+		var escapes = map[uint8]uint8{
+			'n': '\n',
+			'r': '\r',
+			't': '\t',
+			'b': '\b',
+			'0': 0,
+		}
+		str = strings.TrimLeft(strings.Trim(str, "\""), "\"")
+		for i := 0; i < len(str); i++ {
+			var c uint8 = str[i]
+			if c == '\\' {
+				if i == len(str)-1 {
+					break
+				}
+				escape_char, escape_exists := escapes[str[i+1]]
+				if escape_exists {
+					bytes = append(bytes, escape_char)
+					i++
+				}
+				continue
+			}
+			bytes = append(bytes, c)
+		}
+	}
+	return bytes
+}
+
+func parseStatements(statements []*statement, labels map[string]uint16, print_debug bool) (map[uint16][]byte, error) {
 	var address uint16 = 0
+	data := map[uint16][]byte{}
 
 	for _, s := range statements {
 		if s == nil || len(s.source) == 0 || len(s.source[0]) == 0 || s.source[0][0] == ':' {
@@ -147,13 +227,26 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 		arg_int := uint64(0)
 
 		for idx, arg_str := range s.source {
-			if idx > 0 {
+			if idx == 0 {
+				// instruction or directive
+				if strings.Index(arg_str, ".0x") == 0 {
+					// data declaration (.0x1234 "this is a test\n")
+					data_offset, _ := strconv.ParseUint(arg_str[3:], 16, 0)
+					data_string := strings.Join(s.source[1:], " ")
+					data_bytes := parseData(data_string)
+					data[uint16(data_offset)] = data_bytes
+					break
+				}
+
+			} else {
+				// argument
 				if arg_str[0] == 'r' {
+					// register
 					arg_int, _ = strconv.ParseUint(arg_str[1:], 10, 0)
 					s.byte_code[s.byte_count] = uint8(arg_int)
 
 				} else if arg_str[0] == '$' {
-					//immediate value
+					// immediate value
 					if strings.Index(arg_str, "$0x") == 0 {
 						arg_int, _ = strconv.ParseUint(arg_str[3:], 16, 0)
 					} else {
@@ -166,7 +259,7 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 					s.byte_code[s.byte_count] = uint8(arg_int & 0x00ff)
 
 				} else if arg_str[0] == '@' {
-					//label
+					// label
 					arg_int, _ = strconv.ParseUint(fmt.Sprintf("%04x", labels[arg_str[1:]]), 16, 0)
 					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
 					s.byte_code[0] = instruction.opcode
@@ -196,7 +289,7 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 		}
 	}
 
-	return nil
+	return data, nil
 
 }
 
@@ -246,13 +339,34 @@ func main() {
 	labels, _ := createLabels(statements)
 
 	// write statement bytecode chunks
-	err = parseStatements(statements, labels, true)
+	data, err := parseStatements(statements, labels, true)
 	if err != nil {
 		return
 	}
 
-	// concat all statement bytecode chunks into output bytecode
 	bytes_out := make([]byte, 0)
+	// data header
+	bytes_out = append(bytes_out, 1)
+	bytes_out = append(bytes_out, 1)
+
+	// for each data, write the offset, length, and value to bytecode
+	data_size := 0
+	for offset, value := range data {
+		length := uint16(len(value))
+		bytes_out = append(bytes_out, uint8(offset>>8))
+		bytes_out = append(bytes_out, uint8(offset&0xff))
+		bytes_out = append(bytes_out, uint8(length>>8))
+		bytes_out = append(bytes_out, uint8(length&0xff))
+		data_size += 4
+		for _, b := range value {
+			bytes_out = append(bytes_out, b)
+			data_size++
+		}
+	}
+	bytes_out[0] = uint8(data_size >> 8)
+	bytes_out[1] = uint8(data_size & 0xff)
+
+	// concat all statement bytecode chunks into output bytecode
 	for _, s := range statements {
 		for i := 0; i < s.byte_count; i++ {
 			bytes_out = append(bytes_out, s.byte_code[i])
