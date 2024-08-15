@@ -1,5 +1,35 @@
 # test source file
 
+
+# program entry...
+call @main
+
+
+# includes...
+%include "test_functions.s"
+
+
+# aliases...
+~strWelcome       0xf000
+~strTest16Int     0xf020
+~strTest8Int      0xf040
+~strTestByteArray 0xf060
+~strNewline       0xf080
+~strSuccess       0xf084
+~strFailed        0xf090
+~i16_test         0xf100
+~i8_test1         0xf102
+~i8_test2         0xf103
+~i8_bytes         0xf104
+~result           r0
+~arg              r0
+~error            r10
+~PrintChar        1
+~PrintCharAt      2
+~PrintStr         3
+
+
+# data...
 .0xf000 "Welcome to the test program.\n\0"
 .0xf020 "Testing 16-bit integer: \0"
 .0xf040 "Testing 8-bit integer: \0"
@@ -11,29 +41,29 @@
 .0xf102 0x41
 .0xf103 0x42
 .0xf104 [ 0x41, 97, 0x42, 98, 0x43, 99, 0x44, 100, 0x45, 101, 0x0a ]
-.0xf200 1
 
-:start
-    mov r0, $str_welcome_msg 
-    int 3h
-    call @test_16bit_integer
-    cmp r1, 1
+
+# code...
+
+:main
+    mov $arg, $strWelcome
+    int $PrintStr
+    call @fnTest16Int
+    cmp $error, 1
     jz @failed
-    call @test_8bit_integer
-    cmp r1, 1
+    call @fnTest8Int
+    cmp $error, 1
     jz @failed
-    call @test_byte_array
-    cmp r1, 1
+    call @fnTestByteArray
+    cmp $error, 1
     jz @failed
-    mov r0, 0xf084 # success msg
-    int 3
+    mov $arg, $strSuccess
+    int $PrintStr
     jmp @end
 
-%include "test_functions.s"
-
 :failed
-    mov r0, 0xf090
-    int 3
+    mov $arg, $strFailed
+    int $PrintStr
 
 :end
     hlt
