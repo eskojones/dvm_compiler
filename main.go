@@ -77,6 +77,45 @@ func cleanString(dirty string, comment string) string {
 	return clean
 }
 
+func parseAliases(statements []*statement) error {
+	aliases := map[string]string{}
+	for _, s := range statements {
+		if s == nil || len(s.source) == 0 || len(s.source[0]) == 0 || s.source[0][0] == ':' || s.source[0][0] == '.' {
+			continue
+		}
+
+		for idx, arg_str := range s.source {
+			if idx == 0 && arg_str[0] == '~' {
+				// make aliases
+				aliases[arg_str[1:]] = s.source[idx+1]
+				fmt.Printf("alias '%s' = '%s'\n", arg_str[1:], s.source[idx+1])
+				continue
+			}
+		}
+	}
+
+	for _, s := range statements {
+		if s == nil || len(s.source) == 0 || len(s.source[0]) == 0 || s.source[0][0] == ':' || s.source[0][0] == '.' {
+			continue
+		}
+
+		for idx, arg_str := range s.source {
+			if idx > 0 && arg_str[0] == '$' {
+				// apply aliases
+				alias_name := arg_str[1:]
+				alias_value, alias_exists := aliases[alias_name]
+				if !alias_exists {
+					fmt.Printf("Line %d: Invalid alias referenced (%s)\n", s.line_num, alias_name)
+					return errors.New("Invalid alias referenced")
+				}
+				s.source[idx] = alias_value
+			}
+		}
+	}
+
+	return nil
+}
+
 func createLabels(statements []*statement) (map[string]uint16, error) {
 	labels := map[string]uint16{}
 	address := uint16(0)
@@ -98,8 +137,8 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 			continue
 		}
 
-		if instr_name[0] == '.' {
-			//data (ignore this until parse)
+		if instr_name[0] == '.' || instr_name[0] == '~' {
+			//data or alias (ignore this until parse)
 			continue
 		}
 
@@ -119,7 +158,7 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 		for idx, arg_str := range s.source {
 			if idx > 0 {
-				if arg_str[0] == '$' {
+				if strings.ContainsAny(arg_str[0:1], "0123456789") {
 					if isImmediate {
 						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
 						return labels, errors.New("Multiple Immediate Values")
@@ -135,6 +174,7 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 					isImmediate = true
 				}
 			}
+
 			s.byte_count++
 		}
 		address += uint16(s.byte_count)
@@ -236,21 +276,26 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 					data_bytes := parseData(data_string)
 					data[uint16(data_offset)] = data_bytes
 					break
+				} else if arg_str[0] == '~' && len(s.source) == 2 {
+					// alias (~name 0x0000)
+					break
 				}
 
 			} else {
 				// argument
-				if arg_str[0] == 'r' {
+				if arg_str[0] == 'r' || arg_str[0] == 'R' {
 					// register
 					arg_int, _ = strconv.ParseUint(arg_str[1:], 10, 0)
 					s.byte_code[s.byte_count] = uint8(arg_int)
 
-				} else if arg_str[0] == '$' {
+				} else if strings.ContainsAny(arg_str[0:1], "0123456789") {
 					// immediate value
-					if strings.Index(arg_str, "$0x") == 0 {
-						arg_int, _ = strconv.ParseUint(arg_str[3:], 16, 0)
+					if strings.Index(arg_str, "0x") == 0 {
+						arg_int, _ = strconv.ParseUint(arg_str[2:], 16, 0)
+					} else if arg_str[len(arg_str)-1] == 'h' {
+						arg_int, _ = strconv.ParseUint(arg_str[:len(arg_str)-1], 16, 0)
 					} else {
-						arg_int, _ = strconv.ParseUint(arg_str[1:], 10, 0)
+						arg_int, _ = strconv.ParseUint(arg_str, 10, 0)
 					}
 					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
 					s.byte_code[0] = instruction.opcode
@@ -333,6 +378,11 @@ func main() {
 	for _, ins := range instructions {
 		opcode2instr[ins.opcode] = ins
 		name2instr[ins.name] = ins
+	}
+
+	err = parseAliases(statements)
+	if err != nil {
+		return
 	}
 
 	// go through the program and populate the label map with addresses
