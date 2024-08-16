@@ -62,6 +62,8 @@ type statement struct {
 var opcode2instr = map[uint8]instr{}
 var name2instr = map[string]instr{}
 
+var commentChar = ";"
+
 func cleanString(dirty string, comment string) string {
 	var clean = strings.Clone(dirty)
 	var idx = strings.Index(clean, comment)
@@ -384,7 +386,7 @@ func main() {
 
 	// for each line of source, clean the line and create statement struct
 	for line_num, line := range source_lines {
-		var clean = cleanString(line, "#")
+		var clean = cleanString(line, commentChar)
 		if len(clean) == 0 {
 			continue
 		}
