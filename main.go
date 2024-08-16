@@ -63,7 +63,7 @@ var opcode2instr = map[uint8]instr{}
 var name2instr = map[string]instr{}
 
 func cleanString(dirty string, comment string) string {
-	var clean string = strings.Clone(dirty)
+	var clean = strings.Clone(dirty)
 	var idx = strings.Index(clean, comment)
 	if idx != -1 {
 		clean = clean[0:idx]
@@ -106,7 +106,7 @@ func parseAliases(statements []*statement) error {
 				alias_value, alias_exists := aliases[alias_name]
 				if !alias_exists {
 					fmt.Printf("Line %d: Invalid alias referenced (%s)\n", s.line_num, alias_name)
-					return errors.New("Invalid alias referenced")
+					return errors.New("invalid alias referenced")
 				}
 				s.source[idx] = alias_value
 			}
@@ -130,22 +130,22 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 			_, label_exists := labels[instr_name]
 			if label_exists {
 				fmt.Printf("Line %d: Duplicate label (%s)\n", s.line_num, instr_name[1:])
-				return labels, errors.New("Duplicate Labels")
+				return labels, errors.New("duplicate labels")
 			}
 			labels[instr_name[1:]] = address
-			//fmt.Printf("Line %d: Label %s = 0x%04x\n", instr_name[1:], address)
+			// fmt.Printf("Line %d: Label %s = 0x%04x\n", instr_name[1:], address)
 			continue
 		}
 
 		if instr_name[0] == '.' || instr_name[0] == '~' {
-			//data or alias (ignore this until parse)
+			// data or alias (ignore this until parse)
 			continue
 		}
 
 		_, exists := name2instr[instr_name]
 		if !exists {
 			fmt.Printf("Line %d: Invalid instruction (%s)\n", s.line_num, instr_name)
-			return labels, errors.New("Invalid Instruction")
+			return labels, errors.New("invalid instruction")
 		}
 
 		s.byte_count = 0
@@ -153,7 +153,7 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 		if len(s.source) > 3 {
 			fmt.Printf("Line %d: Too many arguments for statement \"%s\".\n", s.line_num, instr_name)
-			return labels, errors.New("Too many arguments in statement")
+			return labels, errors.New("too many arguments")
 		}
 
 		for idx, arg_str := range s.source {
@@ -161,14 +161,14 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 				if strings.ContainsAny(arg_str[0:1], "0123456789") {
 					if isImmediate {
 						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
-						return labels, errors.New("Multiple Immediate Values")
+						return labels, errors.New("multiple immediate values")
 					}
 					s.byte_count++
 					isImmediate = true
 				} else if arg_str[0] == '@' {
 					if isImmediate {
 						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
-						return labels, errors.New("Multiple Immediate Values")
+						return labels, errors.New("multiple immediate values")
 					}
 					s.byte_count++
 					isImmediate = true
@@ -233,7 +233,7 @@ func parseData(data string) []byte {
 		}
 		str = strings.TrimLeft(strings.Trim(str, "\""), "\"")
 		for i := 0; i < len(str); i++ {
-			var c uint8 = str[i]
+			var c = str[i]
 			if c == '\\' {
 				if i == len(str)-1 {
 					break
@@ -320,7 +320,7 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 		address += uint16(s.byte_count)
 
 		if print_debug {
-			//debug print the original source side by side with the byte-code
+			// debug print the original source side by side with the byte-code
 			fmt.Printf("0x%04x ", address)
 			sline := ""
 			for _, sword := range s.source {
@@ -384,7 +384,7 @@ func main() {
 
 	// for each line of source, clean the line and create statement struct
 	for line_num, line := range source_lines {
-		var clean string = cleanString(line, "#")
+		var clean = cleanString(line, "#")
 		if len(clean) == 0 {
 			continue
 		}
