@@ -1,0 +1,6 @@
+@echo off
+cd sourcefiles
+echo compiling...
+go run ../main.go test.s ../test.dvm
+echo running dvm...
+go run ../../dvm/main.go %* ../test.dvm
