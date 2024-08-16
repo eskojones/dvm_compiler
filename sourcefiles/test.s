@@ -1,6 +1,5 @@
 ; test source file
 
-
 ; program entry...
 call @main
 
@@ -23,7 +22,7 @@ call @main
 ~i8_bytes         0xf104
 ~result           r0
 ~arg              r0
-~error            r10
+~err              r10
 ~PrintChar        1
 ~PrintCharAt      2
 ~PrintStr         3
@@ -35,8 +34,8 @@ call @main
 .0xf040 "Testing 8-bit integer: \0"
 .0xf060 "Testing byte array: \0"
 .0xf080 "\r\n\0"
-.0xf084 "Success!\n\0"
-.0xf090 "Failed!\n\0"
+.0xf084 "Success!\0"
+.0xf090 "Failed!\0"
 .0xf100 0x4142
 .0xf102 0x41
 .0xf103 0x42
@@ -49,22 +48,21 @@ call @main
     mov $arg, $strWelcome
     int $PrintStr
     call @fnTest16Int
-    cmp $error, 1
-    jz @failed
+    cmp $err, 1
+    jz @end
     call @fnTest8Int
-    cmp $error, 1
-    jz @failed
+    cmp $err, 1
+    jz @end
     call @fnTestByteArray
-    cmp $error, 1
-    jz @failed
-    mov $arg, $strSuccess
-    int $PrintStr
-    jmp @end
-
-:failed
-    mov $arg, $strFailed
-    int $PrintStr
 
 :end
+    push 0x4444         ; push value 0x4444 onto stack
+    pop $i16_test       ; pop from stack into address in alias $i16_test
+    ld r5, $i16_test    ; load address $i16_test into reg 5
+    mov r0, r5          ; move reg 5 into reg 0
+    int $PrintChar      ; print the character in the low byte of reg 0
+    inc r0              ; increment the value of reg 0
+    int $PrintChar      ; print the character in the low byte of reg 0
+                        ; ...expected output is "DE" (0x44,0x45)
     hlt
 

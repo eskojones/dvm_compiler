@@ -1,16 +1,31 @@
 %include "file.s"
 
+
 :fnTest16Int
     mov r0, $strTest16Int
     int $PrintStr
-    mov r0, $i16_test
-    int $PrintCharAt
-    inc r0
-    int $PrintCharAt
+    ld r2, $i16_test
+    ld r3, $i8_test1
+    cmp r2, r3
+    jz @fnTest16Int_Success
+    mov r0, $strFailed
+    int $PrintStr
     mov r0, $strNewline
     int $PrintStr
-    mov r1, 0
+    mov $err, 1
     ret
+    :fnTest16Int_Success
+        mov r0, $i16_test
+        int $PrintCharAt
+        inc r0
+        int $PrintCharAt
+        mov r0, $strSuccess
+        int $PrintStr
+        mov r0, $strNewline
+        int $PrintStr
+        mov $err, 0
+    ret
+
 
 :fnTest8Int
     mov r0, $strTest8Int
@@ -19,10 +34,13 @@
     int $PrintCharAt
     mov r0, $i8_test2
     int $PrintCharAt
+    mov r0, $strSuccess
+    int $PrintStr
     mov r0, $strNewline
     int $PrintStr
-    mov r1, 0
+    mov $err, 0
     ret
+
 
 :fnTestByteArray
     mov r0, $strTestByteArray     ; print "testing byte array"
@@ -35,7 +53,9 @@
         inc r0                    ; add 1 to reg 0
         cmp r0, r1                ; compare reg 0 and reg 1
         jl @fnTestByteArray_Loop  ; loop if reg 0 is lessthan reg 1
+    mov r0, $strSuccess
+    int $PrintStr
     mov r0, $strNewline           ; print newline string
     int $PrintStr
-    mov r1, 0
+    mov $err, 0
     ret
