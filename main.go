@@ -16,10 +16,8 @@ type instr struct {
 
 var instructions = []instr{
 	{"nop", 0x00, 1},
-	{"hlt", 0xff, 1},
-	{"print", 0xfe, 2},
-	{"ld", 0x01, 4},
-	{"st", 0x02, 4},
+	{"ldi", 0x01, 4},
+	{"sti", 0x02, 4},
 	{"int", 0x03, 2},
 	{"inti", 0x04, 3},
 	{"ret", 0x05, 1},
@@ -49,6 +47,15 @@ var instructions = []instr{
 	{"divi", 0x1d, 4},
 	{"call", 0x1e, 2},
 	{"calli", 0x1f, 3},
+	{"push", 0x20, 2},
+	{"pushi", 0x21, 3},
+	{"pop", 0x22, 2},
+	{"popi", 0x23, 3},
+	// mostly unused/debug instructions below
+	{"ld", 0xfc, 4},
+	{"st", 0xfd, 4},
+	{"print", 0xfe, 2},
+	{"hlt", 0xff, 1},
 }
 
 type statement struct {

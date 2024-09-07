@@ -9,7 +9,7 @@ fnTest16Int:
     int $PrintCharAt
     mov r0, $strNewline
     int $PrintStr
-    mov r1, 0
+    mov $err, 0
     ret
 
 fnTest8Int:
@@ -21,7 +21,7 @@ fnTest8Int:
     int $PrintCharAt
     mov r0, $strNewline
     int $PrintStr
-    mov r1, 0
+    mov $err, 0
     ret
 
 fnTestByteArray:
@@ -37,5 +37,5 @@ fnTestByteArray:
         jl @.loop                 ; loop if reg 0 is lessthan reg 1
     mov r0, $strNewline           ; print newline string
     int $PrintStr
-    mov r1, 0
+    mov $err, 0
     ret

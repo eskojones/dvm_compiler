@@ -1,6 +1,5 @@
 ; test source file
 
-
 ; program entry...
 call @main
 
@@ -23,14 +22,14 @@ call @main
 ~i8_bytes         0xf104
 ~result           r0
 ~arg              r0
-~error            r10
+~err              r10
 ~PrintChar        1
 ~PrintCharAt      2
 ~PrintStr         3
 
 
 ; data...
-0xf000 "Welcome to the test program.\n\0"
+0xf000 "Welcome to the Test Program!\r\n\0"
 0xf020 "Testing 16-bit integer: \0"
 0xf040 "Testing 8-bit integer: \0"
 0xf060 "Testing byte array: \0"
@@ -42,7 +41,6 @@ call @main
 0xf103 0x42
 0xf104 [ 0x41, 97, 0x42, 98, 0x43, 99, 0x44, 100, 0x45, 101, 0x0a ]
 
-
 ; code...
 main:
     
@@ -50,13 +48,13 @@ main:
     mov $arg, $strWelcome
     int $PrintStr
     call @fnTest16Int
-    cmp $error, 1
+    cmp $err, 1
     jz @.failed
     call @fnTest8Int
-    cmp $error, 1
+    cmp $err, 1
     jz @.failed
     call @fnTestByteArray
-    cmp $error, 1
+    cmp $err, 1
     jz @.failed
     mov $arg, $strSuccess
     int $PrintStr
