@@ -53,6 +53,7 @@ var instructions = []instr{
 
 type statement struct {
 	line_num   uint
+    label      string
 	address    uint16
 	source     []string
 	byte_code  [6]byte
@@ -61,7 +62,8 @@ type statement struct {
 
 var opcode2instr = map[uint8]instr{}
 var name2instr = map[string]instr{}
-
+var currentProc = ""
+    
 var commentChar = ";"
 
 func cleanString(dirty string, comment string) string {
@@ -128,18 +130,32 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 		}
 
 		instr_name := s.source[0]
-		if instr_name[0] == ':' {
-			_, label_exists := labels[instr_name]
+		if instr_name[len(instr_name)-1] == ':' {
+            isNewProc := false
+            label := instr_name[:len(instr_name) - 1]
+            if instr_name[0] == '.' {
+                //sub-label
+                label = fmt.Sprintf("%s%s", currentProc, label)
+                isNewProc = false
+            } else {
+                isNewProc = true
+            }
+			_, label_exists := labels[label]
 			if label_exists {
-				fmt.Printf("Line %d: Duplicate label (%s)\n", s.line_num, instr_name[1:])
+				fmt.Printf("Line %d: Duplicate label (%s)\n", s.line_num, label)
 				return labels, errors.New("duplicate labels")
 			}
-			labels[instr_name[1:]] = address
+			labels[label] = address            
 			// fmt.Printf("Line %d: Label %s = 0x%04x\n", instr_name[1:], address)
+            if isNewProc {
+                currentProc = label
+            }
 			continue
 		}
 
-		if instr_name[0] == '.' || instr_name[0] == '~' {
+        s.label = currentProc
+        
+        if instr_name[0] == '~' || strings.ContainsAny(instr_name[:2], "1234567890") {
 			// data or alias (ignore this until parse)
 			continue
 		}
@@ -189,14 +205,16 @@ func parseIntData(data string) (uint8, uint16) {
 	var intval uint64
 	if strings.Index(data, "0x") == 0 {
 		intval, _ = strconv.ParseUint(data[2:], 16, 0)
-	} else {
+    } else if data[len(data)-1] == 'h' {
+        intval, _ = strconv.ParseUint(data[0:len(data)-1], 16, 0)
+    } else {
 		intval, _ = strconv.ParseUint(data, 10, 0)
 	}
-	byte_count := uint8(1)
+	byte_count := 1
 	if intval > 0xff {
 		byte_count = 2
 	}
-	return byte_count, uint16(intval)
+	return uint8(byte_count), uint16(intval)
 }
 
 func parseData(data string) []byte {
@@ -271,43 +289,43 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 		for idx, arg_str := range s.source {
 			if idx == 0 {
 				// instruction or directive
-				if strings.Index(arg_str, ".0x") == 0 {
-					// data declaration (.0x1234 "this is a test\n")
-					data_offset, _ := strconv.ParseUint(arg_str[3:], 16, 0)
-					data_string := strings.Join(s.source[1:], " ")
+				if strings.Index(arg_str, "0x") == 0 {
+					// data declaration (0x1234 "this is a test\n")
+					data_offset, _ := strconv.ParseUint(arg_str[2:], 16, 0)
+                    data_string := strings.Join(s.source[1:], " ")
 					data_bytes := parseData(data_string)
 					data[uint16(data_offset)] = data_bytes
 					break
 				} else if arg_str[0] == '~' && len(s.source) == 2 {
 					// alias (~name 0x0000)
 					break
-				}
+                } else if arg_str[len(arg_str) - 1] == ':' {
+                    break
+                }
 
 			} else {
 				// argument
-				if arg_str[0] == 'r' || arg_str[0] == 'R' {
-					// register
+				if isArgRegister(arg_str) {
+					// register (store 1 byte)
 					arg_int, _ = strconv.ParseUint(arg_str[1:], 10, 0)
 					s.byte_code[s.byte_count] = uint8(arg_int)
 
-				} else if strings.ContainsAny(arg_str[0:1], "0123456789") {
-					// immediate value
-					if strings.Index(arg_str, "0x") == 0 {
-						arg_int, _ = strconv.ParseUint(arg_str[2:], 16, 0)
-					} else if arg_str[len(arg_str)-1] == 'h' {
-						arg_int, _ = strconv.ParseUint(arg_str[:len(arg_str)-1], 16, 0)
-					} else {
-						arg_int, _ = strconv.ParseUint(arg_str, 10, 0)
-					}
+				} else if isArgImmediate(arg_str) {
+					// immediate value (store 2 bytes and change to imm instruction)
+                    _, imm_value := parseIntData(arg_str)
 					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
 					s.byte_code[0] = instruction.opcode
-					s.byte_code[s.byte_count] = uint8(arg_int >> 8)
+					s.byte_code[s.byte_count] = uint8(imm_value >> 8)
 					s.byte_count++
-					s.byte_code[s.byte_count] = uint8(arg_int & 0x00ff)
+					s.byte_code[s.byte_count] = uint8(imm_value & 0x00ff)
 
-				} else if arg_str[0] == '@' {
-					// label
-					arg_int, _ = strconv.ParseUint(fmt.Sprintf("%04x", labels[arg_str[1:]]), 16, 0)
+				} else if isArgLabel(arg_str) {
+					// labels
+                    label_name := arg_str[1:]
+                    if label_name[0] == '.' {
+                        label_name = fmt.Sprintf("%s%s", s.label, label_name)
+                    }
+					arg_int, _ = strconv.ParseUint(fmt.Sprintf("%04x", labels[label_name]), 16, 0)
 					instruction = name2instr[fmt.Sprintf("%si", instruction.name)]
 					s.byte_code[0] = instruction.opcode
 					s.byte_code[s.byte_count] = uint8(arg_int >> 8)
@@ -336,6 +354,18 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 		}
 	}
 	return data, nil
+}
+
+func isArgRegister(arg_str string) bool {
+    return arg_str[0] == 'r' || arg_str[0] == 'R'
+}
+
+func isArgImmediate(arg_str string) bool {
+    return strings.ContainsAny(arg_str[0:1], "1234567890")
+}
+
+func isArgLabel(arg_str string) bool {
+    return arg_str[0] == '@'
 }
 
 func readSourceFile(filename string) ([]string, error) {

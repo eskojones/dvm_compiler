@@ -1,0 +1,6 @@
+#!/bin/zsh
+cd sourcefiles
+echo Compiling...
+go run ../main.go test.s ../test.dvm
+echo Running DVM...
+go run ../../dvm_runtime/main.go $1 ../test.dvm

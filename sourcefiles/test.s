@@ -30,41 +30,42 @@ call @main
 
 
 ; data...
-.0xf000 "Welcome to the test program.\n\0"
-.0xf020 "Testing 16-bit integer: \0"
-.0xf040 "Testing 8-bit integer: \0"
-.0xf060 "Testing byte array: \0"
-.0xf080 "\r\n\0"
-.0xf084 "Success!\n\0"
-.0xf090 "Failed!\n\0"
-.0xf100 0x4142
-.0xf102 0x41
-.0xf103 0x42
-.0xf104 [ 0x41, 97, 0x42, 98, 0x43, 99, 0x44, 100, 0x45, 101, 0x0a ]
+0xf000 "Welcome to the test program.\n\0"
+0xf020 "Testing 16-bit integer: \0"
+0xf040 "Testing 8-bit integer: \0"
+0xf060 "Testing byte array: \0"
+0xf080 "\r\n\0"
+0xf084 "Success!\n\0"
+0xf090 "Failed!\n\0"
+0xf100 0x4142
+0xf102 0x41
+0xf103 0x42
+0xf104 [ 0x41, 97, 0x42, 98, 0x43, 99, 0x44, 100, 0x45, 101, 0x0a ]
 
 
 ; code...
-
-:main
+main:
+    
+.start:
     mov $arg, $strWelcome
     int $PrintStr
     call @fnTest16Int
     cmp $error, 1
-    jz @failed
+    jz @.failed
     call @fnTest8Int
     cmp $error, 1
-    jz @failed
+    jz @.failed
     call @fnTestByteArray
     cmp $error, 1
-    jz @failed
+    jz @.failed
     mov $arg, $strSuccess
     int $PrintStr
-    jmp @end
+    jmp @.end
 
-:failed
+.failed:
     mov $arg, $strFailed
     int $PrintStr
 
-:end
+.end:
     hlt
 
