@@ -45,7 +45,7 @@ call @main
 main:
     
 .start:
-    mov $arg, $strWelcome
+    mov $arg, 0xf000
     int $PrintStr
     call @fnTest16Int
     cmp $err, 1

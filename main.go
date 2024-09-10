@@ -11,51 +11,50 @@ import (
 type instr struct {
 	name   string
 	opcode uint8
-	size   uint8
 }
 
 var instructions = []instr{
-	{"nop", 0x00, 1},
-	{"ldi", 0x01, 4},
-	{"sti", 0x02, 4},
-	{"int", 0x03, 2},
-	{"inti", 0x04, 3},
-	{"ret", 0x05, 1},
-	{"mov", 0x06, 3},
-	{"movi", 0x07, 4},
-	{"cmp", 0x08, 3},
-	{"cmpi", 0x09, 4},
-	{"jmp", 0x0a, 2},
-	{"jmpi", 0x0b, 3},
-	{"jz", 0x0c, 2},
-	{"jzi", 0x0d, 3},
-	{"jnz", 0x0e, 2},
-	{"jnzi", 0x0f, 3},
-	{"jl", 0x10, 2},
-	{"jli", 0x11, 3},
-	{"jg", 0x12, 2},
-	{"jgi", 0x13, 3},
-	{"inc", 0x14, 2},
-	{"dec", 0x15, 2},
-	{"add", 0x16, 3},
-	{"addi", 0x17, 4},
-	{"sub", 0x18, 3},
-	{"subi", 0x19, 4},
-	{"mul", 0x1a, 3},
-	{"muli", 0x1b, 4},
-	{"div", 0x1c, 3},
-	{"divi", 0x1d, 4},
-	{"call", 0x1e, 2},
-	{"calli", 0x1f, 3},
-	{"push", 0x20, 2},
-	{"pushi", 0x21, 3},
-	{"pop", 0x22, 2},
-	{"popi", 0x23, 3},
+	{"nop", 0x00},
+	{"ldi", 0x01},
+	{"sti", 0x02},
+	{"int", 0x03},
+	{"inti", 0x04},
+	{"ret", 0x05},
+	{"mov", 0x06},
+	{"movi", 0x07},
+	{"cmp", 0x08},
+	{"cmpi", 0x09},
+	{"jmp", 0x0a},
+	{"jmpi", 0x0b},
+	{"jz", 0x0c},
+	{"jzi", 0x0d},
+	{"jnz", 0x0e},
+	{"jnzi", 0x0f},
+	{"jl", 0x10},
+	{"jli", 0x11},
+	{"jg", 0x12},
+	{"jgi", 0x13},
+	{"inc", 0x14},
+	{"dec", 0x15},
+	{"add", 0x16},
+	{"addi", 0x17},
+	{"sub", 0x18},
+	{"subi", 0x19},
+	{"mul", 0x1a},
+	{"muli", 0x1b},
+	{"div", 0x1c},
+	{"divi", 0x1d},
+	{"call", 0x1e},
+	{"calli", 0x1f},
+	{"push", 0x20},
+	{"pushi", 0x21},
+	{"pop", 0x22},
+	{"popi", 0x23},
 	// mostly unused/debug instructions below
-	{"ld", 0xfc, 4},
-	{"st", 0xfd, 4},
-	{"print", 0xfe, 2},
-	{"hlt", 0xff, 1},
+	{"ld", 0xfc},
+	{"st", 0xfd},
+	{"print", 0xfe},
+	{"hlt", 0xff},
 }
 
 type statement struct {
@@ -63,7 +62,7 @@ type statement struct {
     label      string
 	address    uint16
 	source     []string
-	byte_code  [6]byte
+	byte_code  [4]byte
 	byte_count int
 }
 
@@ -138,25 +137,20 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 		instr_name := s.source[0]
 		if instr_name[len(instr_name)-1] == ':' {
-            isNewProc := false
             label := instr_name[:len(instr_name) - 1]
             if instr_name[0] == '.' {
                 //sub-label
                 label = fmt.Sprintf("%s%s", currentProc, label)
-                isNewProc = false
             } else {
-                isNewProc = true
+                currentProc = label
             }
 			_, label_exists := labels[label]
 			if label_exists {
 				fmt.Printf("Line %d: Duplicate label (%s)\n", s.line_num, label)
 				return labels, errors.New("duplicate labels")
 			}
-			labels[label] = address            
-			// fmt.Printf("Line %d: Label %s = 0x%04x\n", instr_name[1:], address)
-            if isNewProc {
-                currentProc = label
-            }
+			labels[label] = address
+			fmt.Printf("Line %d: Label %s = 0x%04x\n", s.line_num, label, address)
 			continue
 		}
 
@@ -183,14 +177,7 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 		for idx, arg_str := range s.source {
 			if idx > 0 {
-				if strings.ContainsAny(arg_str[0:1], "0123456789") {
-					if isImmediate {
-						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
-						return labels, errors.New("multiple immediate values")
-					}
-					s.byte_count++
-					isImmediate = true
-				} else if arg_str[0] == '@' {
+				if strings.ContainsAny(arg_str[0:1], "0123456789") || arg_str[0] == '@' {
 					if isImmediate {
 						fmt.Printf("Line %d: Multiple immediate values, this is invalid.\n", s.line_num)
 						return labels, errors.New("multiple immediate values")
@@ -202,7 +189,7 @@ func createLabels(statements []*statement) (map[string]uint16, error) {
 
 			s.byte_count++
 		}
-		address += uint16(s.byte_count)
+		address += 4
 	}
 
 	return labels, nil
@@ -308,6 +295,7 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 					break
                 } else if arg_str[len(arg_str) - 1] == ':' {
                     break
+                } else {
                 }
 
 			} else {
@@ -343,8 +331,8 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 			s.byte_count++
 		}
 
-		s.address = address
-		address += uint16(s.byte_count)
+        s.address = address
+        address += 4
 
 		if print_debug {
 			// debug print the original source side by side with the byte-code
@@ -354,7 +342,7 @@ func parseStatements(statements []*statement, labels map[string]uint16, print_de
 				sline = fmt.Sprintf("%s%s ", sline, sword)
 			}
 			fmt.Printf("%-20s ", sline)
-			for i := 0; i < s.byte_count; i++ {
+			for i := 0; i < 4; i++ {
 				fmt.Printf("%02x ", s.byte_code[i])
 			}
 			fmt.Printf("\n")
@@ -477,7 +465,7 @@ func main() {
 
 	// concat all statement bytecode chunks into output bytecode
 	for _, s := range statements {
-		for i := 0; i < s.byte_count; i++ {
+		for i := 0; i < 4; i++ {
 			bytes_out = append(bytes_out, s.byte_code[i])
 		}
 	}
